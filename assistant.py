@@ -2,6 +2,8 @@ import ollama
 import chromadb
 import psycopg
 import ast
+from colorama import Fore
+from tqdm import tqdm
 from psycopg.rows import dict_row
 
 client = chromadb.Client()
@@ -47,10 +49,18 @@ def store_conversations(prompt, response):
         conn.commit()
     conn.close()
 
+def remove_last_conversation():
+    conn = connect_db()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM conversations WHERE id = (SELECT MAX(id) FROM conversations)")
+        conn.commit()
+    conn.close()
+
+
 def strem_response(prompt):
     response = ''
     stream = ollama.chat(model="llama3.2", messages=convo, stream=True)
-    print("ASSISTANT: \n")
+    print(Fore.LIGHTGREEN_EX + "ASSISTANT: \n")
 
     for chuck in stream:
         content = chuck["message"]["content"]
@@ -85,7 +95,7 @@ def create_vector_db(conversations):
 def retrieve_embeddings(queries, results_per_query=2):
     embeddings = set()
 
-    for query in queries:
+    for query in tqdm(queries, desc="Processing queries to vector database"):
         response = ollama.embeddings(model='nomic-embed-text', prompt=query)
         query_embedding = response["embedding"]
 
@@ -117,7 +127,7 @@ def create_quieres(prompt):
         {'role': 'user', 'content': prompt}
     ]
     response = ollama.chat(model="llama3.2", messages=query_convo)
-    print(f'\nVector database queries: {response['message']['content']}\n')
+    print(Fore.YELLOW + f'\nVector database queries: {response['message']['content']}\n')
 
     try:
         return ast.literal_eval(response['message']['content'])
@@ -162,9 +172,25 @@ conversations = fetch_conversations()
 create_vector_db(conversations=conversations)
 
 while True:
-    prompt = input("USER: \n")
-    recall(prompt=prompt)
-    strem_response(prompt=prompt)
+    prompt = input(Fore.WHITE + "USER: \n")
+
+    if prompt[:7].lower() == "/recall":
+        prompt = prompt[8:]
+        recall(prompt=prompt)
+        strem_response(prompt=prompt)
+    elif prompt[:7].lower() == "/forget":
+        remove_last_conversation()
+        convo = convo[:-2]
+        print('\n')
+    elif prompt[:9].lower() == "/memorize":
+        prompt = prompt[10:]
+        store_conversations(prompt=prompt, response='Memory stored.')
+        print('\n')
+    else:
+        convo.append({"role": "user", "content": prompt})
+        strem_response(prompt=prompt)
+
+    # strem_response(prompt=prompt)
 
 
 
