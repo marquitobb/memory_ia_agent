@@ -20,7 +20,7 @@ DB_PARAMS = {
     "user": "example_user",
     "password": "123456",
     # TODO: Change this to the IP address of the database
-    "host": "192.168.1.79",
+    "host": "192.168.1.142",
     "port": "5432"
 }
 
